@@ -1,0 +1,9 @@
+############################################################################
+# apps/examples/sv32test/Make.defs
+#
+# SPDX-License-Identifier: Apache-2.0
+############################################################################
+
+ifneq ($(CONFIG_EXAMPLES_SV32TEST),)
+CONFIGURED_APPS += $(APPDIR)/examples/sv32test
+endif

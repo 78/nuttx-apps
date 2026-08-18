@@ -599,6 +599,20 @@ static int nsh_execute(FAR struct nsh_vtbl_s *vtbl,
       return nsh_saveresult(vtbl, ret != OK);
     }
 
+  /* ENOENT means that argv[0] was not a file application, so continue and
+   * try the NSH command table below.  Other errors mean that a real file
+   * application was found but could not be loaded or started.  Falling
+   * through in that case makes a background command recursively dispatch
+   * "sh -c" and eventually hit the assertion below instead of reporting
+   * the original resource or loader failure.
+   */
+
+  if (errno != ENOENT)
+    {
+      nsh_error(vtbl, g_fmtcmdfailed, argv[0], "posix_spawnp", NSH_ERRNO);
+      return nsh_saveresult(vtbl, true);
+    }
+
   /* No, not a file name command (or, at least, we were unable to start a
    * program of that name). Treat it like an NSH command.
    */

@@ -71,6 +71,11 @@
 #  error "CONFIG_NETUTILS_NTPCLIENT_SERVERIP must be provided"
 #endif
 
+#if defined(CONFIG_BUILD_KERNEL) && \
+    defined(CONFIG_NETUTILS_NTPCLIENT_STAY_ON)
+#  error "Kernel build supports only one-shot NTP synchronization"
+#endif
+
 #ifndef CONFIG_NETUTILS_NTPCLIENT_NUM_SAMPLES
 #  define CONFIG_NETUTILS_NTPCLIENT_NUM_SAMPLES 5
 #elif CONFIG_NETUTILS_NTPCLIENT_NUM_SAMPLES < 1
@@ -300,6 +305,25 @@ static int ntpc_register_dhcp(void)
 static int ntpc_start_selected(FAR const char *ntp_server_list,
                                uint8_t source)
 {
+#ifdef CONFIG_BUILD_KERNEL
+  FAR char *daemon_argv[] =
+    {
+      (FAR char *)"NTP daemon",
+      (FAR char *)ntp_server_list,
+      NULL
+    };
+  int ret;
+
+  /* A kernel build cannot create a new task from a U-mode entry point.
+   * Run the configured one-shot synchronization in the calling process.
+   */
+
+  g_ntpc_daemon.state = NTP_STARTED;
+  g_ntpc_daemon.source = source;
+  g_ntpc_daemon.pid = getpid();
+  ret = ntpc_daemon(2, daemon_argv);
+  return ret == EXIT_SUCCESS ? g_ntpc_daemon.pid : -EIO;
+#else
   FAR char *task_argv[] =
     {
       (FAR char *)ntp_server_list,
@@ -331,6 +355,7 @@ static int ntpc_start_selected(FAR const char *ntp_server_list,
   while (g_ntpc_daemon.state == NTP_STARTED);
 
   return g_ntpc_daemon.pid;
+#endif
 }
 
 /****************************************************************************
@@ -688,8 +713,8 @@ static void ntpc_apply_offset(FAR struct timespec *tp,
  *
  ****************************************************************************/
 
-static void ntpc_settime(int64_t offset, FAR struct timespec *start_realtime,
-                         FAR struct timespec *start_monotonic)
+static int ntpc_settime(int64_t offset, FAR struct timespec *start_realtime,
+                        FAR struct timespec *start_monotonic)
 {
   struct timespec tp;
   struct timespec curr_realtime;
@@ -728,7 +753,7 @@ static void ntpc_settime(int64_t offset, FAR struct timespec *start_realtime,
       nwarn("System time altered by other task by %ju msecs, "
             "do not apply offset.\n", (intmax_t)diff_diff_ms);
 
-      return;
+      return -EAGAIN;
     }
 
   /* Apply offset */
@@ -737,13 +762,21 @@ static void ntpc_settime(int64_t offset, FAR struct timespec *start_realtime,
 
   /* Set the system time */
 
-  clock_settime(CLOCK_REALTIME, &tp);
+  if (clock_settime(CLOCK_REALTIME, &tp) < 0)
+    {
+      int errval = errno;
+
+      nerr("ERROR: Failed to set system time: %d\n", errval);
+      return -errval;
+    }
 
   ninfo("Set time to %ju.%03ld seconds (offset: %s%lu.%03lu).\n",
         (intmax_t)tp.tv_sec, tp.tv_nsec / NSEC_PER_MSEC,
         offset < 0 ? "-" : "",
         (unsigned long)ntp_secpart(int64abs(offset)),
         ntp_nsecpart(int64abs(offset)) / NSEC_PER_MSEC);
+
+  return OK;
 }
 
 /****************************************************************************
@@ -1485,30 +1518,23 @@ static int ntpc_daemon(int argc, FAR char **argv)
               int64_t offset1 = samples[nsamples / 2].offset;
               int64_t offset2 = samples[nsamples / 2 - 1].offset;
 
-              /* Average of two middle offsets. */
+              /* Average without overflowing when both offsets are large.
+               * This matters during first boot when CLOCK_REALTIME is still
+               * near the Unix epoch.
+               */
 
-              if (offset1 > 0 && offset2 > 0)
-                {
-                  offset = (offset1 + offset2) / 2;
-                }
-              else if (offset1 < 0 && offset2 < 0)
-                {
-                  offset1 = -offset1;
-                  offset2 = -offset2;
-
-                  offset = (offset1 + offset2) / 2;
-
-                  offset = -offset;
-                }
-              else
-                {
-                  offset = (offset1 + offset2) / 2;
-                }
+              offset = offset1 / 2 + offset2 / 2;
+              offset += (offset1 % 2 + offset2 % 2) / 2;
             }
 
           /* Adjust system time. */
 
-          ntpc_settime(offset, &start_realtime, &start_monotonic);
+          ret = ntpc_settime(offset, &start_realtime, &start_monotonic);
+          if (ret < 0)
+            {
+              errval = -ret;
+              continue;
+            }
 
           /* Save samples for ntpc_status() */
 
@@ -1614,7 +1640,9 @@ void ntpc_dualstack_family(int family)
 
 int ntpc_start_with_list(FAR const char *ntp_server_list)
 {
+#ifndef CONFIG_BUILD_KERNEL
   int ret;
+#endif
 
   if (ntp_server_list == NULL || ntp_server_list[0] == '\0')
     {
@@ -1627,10 +1655,16 @@ int ntpc_start_with_list(FAR const char *ntp_server_list)
   if (g_ntpc_daemon.state == NTP_NOT_RUNNING ||
       g_ntpc_daemon.state == NTP_STOPPED)
     {
+#ifdef CONFIG_BUILD_KERNEL
+      sem_post(&g_ntpc_daemon.lock);
+      return ntpc_start_selected(ntp_server_list,
+                                 NTP_SERVER_SOURCE_EXPLICIT);
+#else
       ret = ntpc_start_selected(ntp_server_list,
                                 NTP_SERVER_SOURCE_EXPLICIT);
       sem_post(&g_ntpc_daemon.lock);
       return ret;
+#endif
     }
 
   sem_post(&g_ntpc_daemon.lock);
@@ -1680,9 +1714,14 @@ int ntpc_start(void)
       return -ENOENT;
     }
 
+#ifdef CONFIG_BUILD_KERNEL
+  sem_post(&g_ntpc_daemon.lock);
+  return ntpc_start_selected(ntp_server_list, source);
+#else
   ret = ntpc_start_selected(ntp_server_list, source);
   sem_post(&g_ntpc_daemon.lock);
   return ret;
+#endif
 }
 
 #ifdef CONFIG_NETUTILS_DHCPC

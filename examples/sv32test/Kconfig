@@ -1,0 +1,27 @@
+# For a description of the syntax of this configuration file, see
+# kconfig-language.txt in the NuttX tools repository.
+
+config EXAMPLES_SV32TEST
+	tristate "RISC-V Sv32 user permission test"
+	default n
+	---help---
+		Build a U-mode test program that verifies basic syscall operation and
+		can deliberately violate text write, data execute, and kernel access
+		permissions.  Each fault case is intended to be launched as a separate
+		process so the kernel and shell can demonstrate fault isolation.
+
+if EXAMPLES_SV32TEST
+
+config EXAMPLES_SV32TEST_PROGNAME
+	string "Program name"
+	default "sv32test"
+
+config EXAMPLES_SV32TEST_PRIORITY
+	int "Task priority"
+	default 100
+
+config EXAMPLES_SV32TEST_STACKSIZE
+	int "Task stack size"
+	default DEFAULT_TASK_STACKSIZE
+
+endif

@@ -368,8 +368,14 @@ int nsh_fileapp(FAR struct nsh_vtbl_s *vtbl, FAR const char *cmd,
 #if !defined(CONFIG_SCHED_WAITPID) || !defined(CONFIG_NSH_DISABLEBG)
         {
           struct sched_param sched;
-          sched_getparam(ret, &sched);
-          nsh_output(vtbl, "%s [%d:%d]\n", cmd, ret, sched.sched_priority);
+
+          /* Report the spawned task, not the posix_spawnp() status: ret is
+           * zero here on success, so querying and printing it described the
+           * idle task instead of the backgrounded command.
+           */
+
+          sched_getparam(pid, &sched);
+          nsh_output(vtbl, "%s [%d:%d]\n", cmd, pid, sched.sched_priority);
 
           /* Backgrounded commands always 'succeed' as long as we can start
            * them.

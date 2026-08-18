@@ -1,0 +1,27 @@
+# For a description of the syntax of this configuration file, see
+# kconfig-language.txt in the NuttX tools repository.
+
+config EXAMPLES_BUSY
+	tristate "CPU-bound SMP load generator"
+	default n
+	depends on SMP
+	---help---
+		Build a U-mode load generator that loops until it is terminated from
+		the shell.  The application never sets CPU affinity; normal SMP
+		scheduling automatically chooses an available CPU.
+
+if EXAMPLES_BUSY
+
+config EXAMPLES_BUSY_PROGNAME
+	string "Program name"
+	default "busy"
+
+config EXAMPLES_BUSY_PRIORITY
+	int "Task priority"
+	default 100
+
+config EXAMPLES_BUSY_STACKSIZE
+	int "Task stack size"
+	default DEFAULT_TASK_STACKSIZE
+
+endif

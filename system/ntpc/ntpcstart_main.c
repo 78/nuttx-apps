@@ -54,7 +54,11 @@ int main(int argc, FAR char *argv[])
     }
 
   printf("NTP client started successfully (task ID: %d)\n", pid);
+#ifdef CONFIG_BUILD_KERNEL
+  printf("One-shot NTP synchronization completed\n");
+#else
   printf("NTP client is now running in the background\n");
+#endif
 
   return EXIT_SUCCESS;
 }

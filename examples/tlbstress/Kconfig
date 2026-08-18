@@ -1,0 +1,30 @@
+#
+# For a description of the syntax of this configuration file, see
+# kconfig-language.txt in the NuttX tools repository.
+#
+
+config EXAMPLES_TLBSTRESS
+	tristate "Cross-core TLB / addrenv stress test"
+	default n
+	depends on SMP
+	depends on ARCH_ADDRENV
+	---help---
+		Build a U-mode stress program that grows the heap on one CPU while a
+		sibling pthread immediately touches the new pages on another CPU.
+		Used by G.2.1b to exercise mapping-side TLB shootdown.
+
+if EXAMPLES_TLBSTRESS
+
+config EXAMPLES_TLBSTRESS_PROGNAME
+	string "Program name"
+	default "tlbstress"
+
+config EXAMPLES_TLBSTRESS_PRIORITY
+	int "Task priority"
+	default 100
+
+config EXAMPLES_TLBSTRESS_STACKSIZE
+	int "Task stack size"
+	default 4096
+
+endif

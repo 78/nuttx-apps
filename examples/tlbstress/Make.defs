@@ -1,0 +1,9 @@
+############################################################################
+# apps/examples/tlbstress/Make.defs
+#
+# SPDX-License-Identifier: Apache-2.0
+############################################################################
+
+ifneq ($(CONFIG_EXAMPLES_TLBSTRESS),)
+CONFIGURED_APPS += $(APPDIR)/examples/tlbstress
+endif

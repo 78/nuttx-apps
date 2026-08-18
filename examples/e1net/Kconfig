@@ -1,0 +1,27 @@
+# For a description of the syntax of this configuration file, see
+# kconfig-language.txt in the NuttX tools repository.
+
+config EXAMPLES_E1NET
+	tristate "E.1 U-mode DNS/TCP/TLS probe"
+	default n
+	depends on CRYPTO_MBEDTLS && LIBC_NETDB && NET_TCP
+	---help---
+		Build a U-mode network probe for the ESP32-S31 E.1 baseline.  It
+		resolves a host, connects over TCP, verifies a TLS server certificate,
+		and checks an HTTP response while reporting timing and heap metrics.
+
+if EXAMPLES_E1NET
+
+config EXAMPLES_E1NET_PROGNAME
+	string "Program name"
+	default "e1net"
+
+config EXAMPLES_E1NET_PRIORITY
+	int "Task priority"
+	default 100
+
+config EXAMPLES_E1NET_STACKSIZE
+	int "Task stack size"
+	default 32768
+
+endif

@@ -73,7 +73,7 @@ add_subdirectory(wireless)
 
 # add examples and external at the end to allow library dependencies
 add_subdirectory(examples)
-if(EXISTS ${CMAKE_CURRENT_LIST_DIR}/external)
+if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/external/CMakeLists.txt")
   add_subdirectory(external)
 endif()
 
